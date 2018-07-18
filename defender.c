@@ -40,7 +40,7 @@ double run_defense_move(net_p network, vector<int>& visited_nodes, chromosome de
 				case 1: added_host++; break;
 				case 2: added_resource++; break;
 			}
-			which = (which++) % 3;
+			which = (which + 1) % 3;
 		}
 	}
 
@@ -58,7 +58,7 @@ double run_defense_move(net_p network, vector<int>& visited_nodes, chromosome de
 				case 1: removed_host++; break;
 				case 2: removed_resource++; break;
 			}
-			which = (which++) % 3;
+			which = (which + 1) % 3;
 		}
 	}
 
@@ -74,7 +74,7 @@ double run_defense_move(net_p network, vector<int>& visited_nodes, chromosome de
 	vector<short> detected(network->max_network, 0);
 	network->num_detected = 0;
 	for(int i = 0; i < network->num_vertices; i++) {
-		if(visited_nodes[i] == 1 && get_random_double() > 0.5 && 
+		if(visited_nodes[i] == 1 && get_random_double() > 0.5 &&
 			((i >= network->core_vertices) || (i < network->core_vertices && network->real_nodes[i] != 1))) {
 				detected[i] = 1;
 				network->num_detected++;
