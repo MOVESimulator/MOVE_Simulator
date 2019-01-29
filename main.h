@@ -33,6 +33,7 @@ extern uint defense_budget;
 extern uint attack_budget;
 extern uint max_resources;
 extern uint max_resources_per_host;
+extern uint num_ports;
 
 extern uint min_value;
 extern uint max_value;
@@ -42,7 +43,8 @@ extern uint nr_real_nodes;
 extern uint max_network_size;
 extern uint type;
 
-extern uint scan_cost;
+extern uint access_cost;
+extern uint port_scan_cost;
 extern uint diversify_resource;
 extern uint wait_cost;
 extern uint defense_cost;
@@ -71,3 +73,6 @@ extern double similarity_threshold;
 extern int attacker_node;
 
 extern uint *resource_popularity;
+
+extern uint port_per_host;
+extern double percentage_of_firewalls;

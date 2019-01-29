@@ -5,11 +5,11 @@
 #include "attacker.h"
 #include "defender.h"
 
-// global variables accesible to others:
+// global variables accessible to others:
 unsigned long long  seed;
 
 uint scenario;
-uint  runs;
+uint runs;
 uint pop_size_attack;
 uint pop_size_defense;
 uint genotype_size_attacker;
@@ -26,6 +26,7 @@ uint defense_budget;
 uint attack_budget;
 uint max_resources;
 uint max_resources_per_host;
+uint num_ports;
 
 uint min_value;
 uint max_value;
@@ -35,7 +36,8 @@ uint nr_real_nodes;
 uint max_network_size;
 uint type;
 
-uint scan_cost;
+uint access_cost;
+uint port_scan_cost;
 uint wait_cost;
 uint defense_cost;
 
@@ -68,21 +70,26 @@ int attacker_node;
 
 uint *resource_popularity;
 
+uint port_per_host;
+double percentage_of_firewalls;
 
-void main(int argc, char* argv[])
+
+int main(int argc, char* argv[])
 {
 	uint n, i;
 	//check that the number of parameters is either 2 (when reading only config.txt) or 4 (when reading config.txt but also preconfigured network)
-	validate_command_line(argc, argv, parameters);
+	validate_command_line(argc, argv, parameters); 
 
 	//Read all parameters from config.txt and ensure they are correct
-	get_parameters(parameters);
+	get_parameters(parameters); 
 
 	//create the basic network
-	net_p base_network = create_network(UNDIRECTED, network_size, max_network_size, network_sparsity, preconfig);
+	net_p base_network = create_network(UNDIRECTED, network_size, max_network_size, network_sparsity, num_ports, preconfig); 
+
 
 	//create resources for basic network
-	create_resources(base_network, max_resources, max_resources_per_host, preconfig);
+	base_network->num_ports = num_ports;
+	create_resources(base_network, max_resources, max_resources_per_host, preconfig); 
 
 	resource_popularity = (uint*)calloc(sizeof(double), (base_network->max_resources));
 
@@ -94,10 +101,10 @@ void main(int argc, char* argv[])
 	//display_network(base_network, 0);
 	//display_resources(base_network);
 
+
 	exploit_cost = (int*) calloc(sizeof(int), (base_network->max_resources));
 
 	net_p extended_network = new net_t;
-
 	copy_network(base_network, extended_network);
 	network_mangling(extended_network);
 
@@ -110,11 +117,6 @@ void main(int argc, char* argv[])
 	chromosome *attackers = (chromosome *)malloc(sizeof(chromosome) * pop_size_attack);
 	chromosome *defenders = (chromosome *)malloc(sizeof(chromosome) * pop_size_defense);
 
-	// create lists of visited nodes for each attacker
-	vector< vector<int> > visited(pop_size_attack);
-	for(int i = 0; i < pop_size_attack; i++)		
-		visited[i].resize(evolved_network->max_network);
-
 	//Assign attacker to a node in the network
 	if (attacker_node == -1) {
 		attacker_node = create_attacker_node(evolved_network);
@@ -123,12 +125,12 @@ void main(int argc, char* argv[])
 	//Main loop
 	for (n = 0; n < runs; n++) {
 
+		graphviz_network_stats(evolved_network, res_similarity, exploit_cost, "init.txt");
+
 		get_resource_similarity(res_similarity, base_network->max_resources);
 		display_resource_similarity(res_similarity, base_network->max_resources);
 		get_resource_popularity(resource_popularity, base_network->max_resources);
 		get_vulnerability_cost(exploit_cost, base_network->max_resources, attack_budget);
-
-		network_stats(evolved_network, res_similarity, exploit_cost);
 
 		printf("Run %d...\n", n + 1);
 		sprintf(name, "log_%d.txt", n + 1);
@@ -139,9 +141,9 @@ void main(int argc, char* argv[])
 				initialize(defenders, pop_size_defense, genotype_size_defender, defense_budget);
 
 				for (uint j = 0; j < pop_size_defense; j++) {
-					defenders[j].fitness = run_defense_move(evolved_network, visited[0], defenders, j, res_similarity);
+					defenders[j].fitness = run_defense_move(evolved_network, defenders, j, res_similarity);
 					for (uint z = 0; z < pop_size_attack; z++) {
-						attackers[z].fitness += run_attack_move(evolved_network, attackers, z, res_similarity, exploit_cost, visited[z], i, n, -1);
+						attackers[z].fitness += run_attack_move(evolved_network, attackers, z, res_similarity, exploit_cost, i, n, -1);
 					}				
 				}
 			}
@@ -165,19 +167,14 @@ void main(int argc, char* argv[])
 
 				for (uint z = 0; z < pop_size_attack; z++) {
 					for (uint k = 0; k < games; k++) {
-						defenders[best_defender].fitness += run_defense_move(evolved_network, visited[z], defenders, best_defender, res_similarity);
-						attackers[z].fitness += run_attack_move(evolved_network, attackers, z, res_similarity, exploit_cost, visited[z], i, n, k);
+						defenders[best_defender].fitness += run_defense_move(evolved_network, defenders, best_defender, res_similarity);
+						attackers[z].fitness += run_attack_move(evolved_network, attackers, z, res_similarity, exploit_cost, i, n, k);
 						restore_budget(defenders, pop_size_defense, defense_budget, best_defender);
 						restore_budget(attackers, pop_size_attack, attack_budget, z);
 
 						// update adjacency changes before the next round
 						evolved_network->last_adjacency = evolved_network->adjacency;
 					}
-				}
-
-				// reset lists of visited nodes
-				for (int k = 0; k < pop_size_attack; k++) {
-					visited[k].assign(evolved_network->max_network, 0);
 				}
 			}
 
@@ -191,18 +188,13 @@ void main(int argc, char* argv[])
 
 				for (uint j = 0; j < pop_size_defense; j++) {
 					for (uint k = 0; k < games; k++) {
-						defenders[j].fitness += run_defense_move(evolved_network, visited[best_attacker], defenders, j, res_similarity);
-						attackers[best_attacker].fitness += run_attack_move(evolved_network, attackers, best_attacker, res_similarity, exploit_cost, visited[best_attacker], i, n, k);
+						defenders[j].fitness += run_defense_move(evolved_network, defenders, j, res_similarity);
+						attackers[best_attacker].fitness += run_attack_move(evolved_network, attackers, best_attacker, res_similarity, exploit_cost, i, n, k);
 						restore_budget(defenders, pop_size_defense, defense_budget, j);
 						restore_budget(attackers, pop_size_attack, attack_budget, best_attacker);
 
 						// update adjacency changes before the next round
 						evolved_network->last_adjacency = evolved_network->adjacency;
-					}
-
-					// reset lists of visited nodes
-					for (int k = 0; k < pop_size_attack; k++) {
-						visited[k].assign(evolved_network->max_network, 0);
 					}
 				}
 			}
@@ -218,24 +210,26 @@ void main(int argc, char* argv[])
 				set_fitness_to_zero(defenders, pop_size_defense);
 
 				for (uint j = 0; j < pop_size_defense; j++) {
+					double diff = 0.;
 					for (uint z = 0; z < pop_size_attack; z++) {
 						for (uint k = 0; k < games; k++) {
-							defenders[j].fitness += run_defense_move(evolved_network, visited[z], defenders, j, res_similarity);
-							attackers[z].fitness += run_attack_move(evolved_network, attackers, z, res_similarity, exploit_cost, visited[z], i, n, k);
+							defenders[j].fitness += run_defense_move(evolved_network, defenders, j, res_similarity);
+							attackers[z].fitness += run_attack_move(evolved_network, attackers, z, res_similarity, exploit_cost, i, n, k);
 							restore_budget(defenders, pop_size_defense, defense_budget, j);
 							restore_budget(attackers, pop_size_attack, attack_budget, z);
 
 							// update adjacency changes before the next round
 							evolved_network->last_adjacency = evolved_network->adjacency;
 						}
-					}
 
-					// reset lists of visited nodes
-					for (int k = 0; k < pop_size_attack; k++) {
-						visited[k].assign(evolved_network->max_network, 0);
+						diff += attackers[z].fitness / (max_network_size * games);
 					}
+					
+					defenders[j].fitness -= diff / pop_size_attack;
 				}
 			}
+
+			network_stats(evolved_network, res_similarity, exploit_cost);
 
 			logging(name, log_level, i + 1, defenders, pop_size_defense, "Defense");
 			logging(name, log_level, i + 1, attackers, pop_size_attack, "Attack");
@@ -244,7 +238,9 @@ void main(int argc, char* argv[])
 			restore_budget(attackers, pop_size_attack, attack_budget, -1);
 
 			copy_network(extended_network, evolved_network);
+
 			network_mangling(evolved_network);
+
 		} //loop for generations
 
 		printf("\n");
@@ -259,4 +255,6 @@ void main(int argc, char* argv[])
 	delete_network(evolved_network);
 	delete_population(attackers, pop_size_attack, genotype_size_attacker);
 	delete_population(defenders, pop_size_defense, genotype_size_defender);*/
+
+	return 0;
 }

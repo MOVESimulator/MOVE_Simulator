@@ -74,13 +74,15 @@ void get_parameters(char parameters[])
 	fscanf(fp, "%u %s", &attacker_node, dummy);
 	fscanf(fp, "%u %s", &max_resources, dummy);
 	fscanf(fp, "%u %s", &max_resources_per_host, dummy);
+	fscanf(fp, "%u %s", &num_ports, dummy);
 	fscanf(fp, "%u %s", &min_value, dummy);
 	fscanf(fp, "%u %s", &max_value, dummy);
 
 	fscanf(fp, "%u %s", &network_size, dummy);
 	fscanf(fp, "%u %s", &nr_real_nodes, dummy);
 	fscanf(fp, "%u %s", &max_network_size, dummy);
-	fscanf(fp, "%u %s", &scan_cost, dummy);
+	fscanf(fp, "%u %s", &access_cost, dummy);
+	fscanf(fp, "%u %s", &port_scan_cost, dummy);
 	fscanf(fp, "%u %s", &diversify_resource, dummy);
 	fscanf(fp, "%u %s", &defense_cost, dummy);
 	fscanf(fp, "%llu %s", &seed, dummy);
@@ -95,6 +97,9 @@ void get_parameters(char parameters[])
 
 	fscanf(fp, "%s %s", final_output_file, dummy);
 	fscanf(fp, "%s %s", network_file, dummy);
+
+	//fscanf(fp, "%u %s", &port_per_host, dummy);
+	fscanf(fp, "%lf %s", &percentage_of_firewalls, dummy);
 
 	fclose(fp);
 
@@ -143,6 +148,17 @@ void get_parameters(char parameters[])
 	}
 	else {
 		srand((uint)seed);
+	}
+
+	//some condition for ports per host
+
+	/*if (port_per_host) {
+
+	}*/
+
+	if (percentage_of_firewalls < 0 || percentage_of_firewalls > 100) {
+		puts("Percentage of firewalls must be in range [0, 1]. Percentage set to 0.\n");
+		percentage_of_firewalls = 0;
 	}
 
 	puts("********* Beginning execution *********");
